@@ -1,7 +1,9 @@
 package dev.urlshortener.controller;
 
+import dev.urlshortener.dto.CreateLinkRequest;
 import dev.urlshortener.entity.Link;
 import dev.urlshortener.service.LinkService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,15 +20,10 @@ public class LinkController {
     }
 
     @PostMapping
-    public ResponseEntity<?> createShortLink(@RequestBody Map<String, String> request) {
+    public ResponseEntity<?> createShortLink(
+            @Valid @RequestBody CreateLinkRequest request) {
 
-        String originalUrl = request.get("url");
-
-        if (originalUrl == null || originalUrl.isBlank()) {
-            return ResponseEntity.badRequest().body("URL is required");
-        }
-
-        Link link = linkService.createShortLink(originalUrl);
+        Link link = linkService.createShortLink(request.url(), request.customCode());
 
         return ResponseEntity.ok(Map.of(
                 "code", link.getCode(),

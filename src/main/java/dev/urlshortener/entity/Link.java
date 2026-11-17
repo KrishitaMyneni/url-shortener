@@ -11,11 +11,14 @@ public class Link {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 7)
+    @Column(nullable = false, unique = true, length = 16)
     private String code;
 
     @Column(nullable = false, length = 2048)
     private String originalUrl;
+
+    @Column(nullable = false)
+    private Long clickCount = 0L;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
@@ -50,5 +53,13 @@ public class Link {
 
     public LocalDateTime getCreatedAt() {
         return createdAt;
+    }
+
+    public Long getClickCount() {
+        return clickCount;
+    }
+
+    public void setClickCount(Long clickCount) {
+        this.clickCount = clickCount;
     }
 }
