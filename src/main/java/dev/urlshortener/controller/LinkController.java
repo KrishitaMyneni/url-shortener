@@ -1,13 +1,13 @@
 
 package dev.urlshortener.controller;
 
+import dev.urlshortener.config.RateLimitConfig;
 import dev.urlshortener.dto.CreateLinkRequest;
 import dev.urlshortener.entity.Link;
 import dev.urlshortener.service.LinkService;
-
 import io.github.bucket4j.Bucket;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,28 +19,31 @@ import java.util.Map;
 public class LinkController {
 
     private final LinkService linkService;
-    private final Bucket createLinkBucket;
+    private final RateLimitConfig rateLimitConfig;
 
     public LinkController(
             LinkService linkService,
-            Bucket createLinkBucket) {
+            RateLimitConfig rateLimitConfig) {
         this.linkService = linkService;
-        this.createLinkBucket = createLinkBucket;
+        this.rateLimitConfig = rateLimitConfig;
     }
 
     @PostMapping
     public ResponseEntity<?> createShortLink(
-            @Valid @RequestBody CreateLinkRequest request) {
+            @Valid @RequestBody CreateLinkRequest request,
+            HttpServletRequest httpRequest) {
 
-        if (!createLinkBucket.tryConsume(1)) {
+        String ipAddress = httpRequest.getRemoteAddr();
+        Bucket bucket = rateLimitConfig.resolveCreateBucket(ipAddress);
+
+        if (!bucket.tryConsume(1)) {
             return ResponseEntity
                     .status(HttpStatus.TOO_MANY_REQUESTS)
                     .body(Map.of("error", "Rate limit exceeded. Try again later."));
         }
 
         Link link = linkService.createShortLink(
-                request.url(),
-                request.customCode());
+                request.url(), request.customCode());
 
         return ResponseEntity.ok(Map.of(
                 "code", link.getCode(),
