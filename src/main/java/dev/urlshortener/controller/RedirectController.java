@@ -1,10 +1,14 @@
 
 package dev.urlshortener.controller;
 
+import dev.urlshortener.config.RateLimitConfig;
 import dev.urlshortener.entity.ClickDaily;
 import dev.urlshortener.entity.Link;
 import dev.urlshortener.repository.ClickDailyRepository;
 import dev.urlshortener.repository.LinkRepository;
+
+import io.github.bucket4j.Bucket;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
@@ -21,40 +25,45 @@ public class RedirectController {
     private final LinkRepository linkRepository;
     private final ClickDailyRepository clickDailyRepository;
     private final RedisTemplate<String, String> redisTemplate;
+    private final RateLimitConfig rateLimitConfig;
 
     public RedirectController(
             LinkRepository linkRepository,
             ClickDailyRepository clickDailyRepository,
-            RedisTemplate<String, String> redisTemplate) {
+            RedisTemplate<String, String> redisTemplate,
+            RateLimitConfig rateLimitConfig) {
 
         this.linkRepository = linkRepository;
         this.clickDailyRepository = clickDailyRepository;
         this.redisTemplate = redisTemplate;
+        this.rateLimitConfig = rateLimitConfig;
     }
 
     @GetMapping("/{code}")
-    public ResponseEntity<Void> redirect(@PathVariable String code) {
+    public ResponseEntity<Void> redirect(
+            @PathVariable String code,
+            HttpServletRequest request) {
+
+        String ipAddress = request.getRemoteAddr();
+
+        Bucket bucket = rateLimitConfig.resolveRedirectBucket(ipAddress);
+
+        if (!bucket.tryConsume(1)) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build();
+        }
 
         String originalUrl = redisTemplate.opsForValue().get(code);
 
-        Link link;
+        Link link = linkRepository.findByCode(code)
+                .orElseThrow(() -> new RuntimeException("Short URL not found"));
 
         if (originalUrl == null) {
-
-            link = linkRepository.findByCode(code)
-                    .orElseThrow(() -> new RuntimeException("Short URL not found"));
-
             originalUrl = link.getOriginalUrl();
 
             redisTemplate.opsForValue().set(
                     code,
                     originalUrl,
                     Duration.ofHours(24));
-
-        } else {
-
-            link = linkRepository.findByCode(code)
-                    .orElseThrow(() -> new RuntimeException("Short URL not found"));
         }
 
         link.setClickCount(link.getClickCount() + 1);
