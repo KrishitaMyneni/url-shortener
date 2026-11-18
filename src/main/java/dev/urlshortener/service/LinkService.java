@@ -30,8 +30,15 @@ public class LinkService {
 
         if (customCode != null && !customCode.isBlank()) {
 
+            if (customCode.equalsIgnoreCase("api")
+                    || customCode.equalsIgnoreCase("actuator")) {
+                throw new IllegalArgumentException(
+                        "This custom code is reserved");
+            }
+
             if (linkRepository.existsByCode(customCode)) {
-                throw new IllegalArgumentException("Custom code is already taken");
+                throw new IllegalArgumentException(
+                        "Custom code is already taken");
             }
 
             code = customCode;
@@ -70,8 +77,9 @@ public class LinkService {
             String scheme = uri.getScheme();
 
             if (scheme == null ||
-                    (!scheme.equalsIgnoreCase("http") &&
-                            !scheme.equalsIgnoreCase("https"))) {
+                    (!scheme.equalsIgnoreCase("http")
+                            && !scheme.equalsIgnoreCase("https"))) {
+
                 throw new IllegalArgumentException(
                         "Only HTTP and HTTPS URLs are allowed");
             }
